@@ -1,0 +1,13 @@
+
+
+Features: NULL | Square Footage | Number of Bedrooms | Age
+----------------------------------------------------------------
+
+Feature = (1, 1250, 4, 25)
+ Target = (65000)
+Feature = (1, 1800, 5, 18)
+ Target = (100000)
+Feature = (1, 2150, 7, 22)
+ Target = (125000)
+Feature = (1, 1720, 5, 20)
+ Target = (85000)
