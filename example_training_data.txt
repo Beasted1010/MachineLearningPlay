@@ -3,6 +3,7 @@
 
 Features: Square Footage | Number of Bedrooms | Age
 ----------------------------------------------------------------
+Alpha = 0.00000005
 
 Feature = (1250, 4, 25)
  Target = (65000)
@@ -12,6 +13,28 @@ Feature = (2150, 7, 22)
  Target = (125000)
 Feature = (1720, 5, 20)
  Target = (85000)
+Feature = (1600, 5, 20)
+ Target = (90000)
+Feature = (1150, 4, 12)
+ Target = (75000)
+Feature = (1825, 5, 13)
+ Target = (100000)
+Feature = (950, 3, 8)
+ Target = (60000)
+Feature = (900, 2, 9)
+ Target = (54000)
+Feature = (2100, 6, 14)
+ Target = (150000)
+Feature = (2300, 7, 7)
+ Target = (160000)
+Feature = (2000, 6, 5)
+ Target = (140000)
+Feature = (1500, 5, 6)
+ Target = (80000)
+Feature = (1300, 4, 9)
+ Target = (70000)
+Feature = (1400, 4, 10)
+ Target = (72000)
  
  
 ----------------------------------------------------------------

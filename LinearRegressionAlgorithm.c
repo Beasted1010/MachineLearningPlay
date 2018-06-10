@@ -4,9 +4,10 @@
 #include <time.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <string.h>
 
-#define MAX_DATA_RANGE 10
-#define MIN_DATA_RANGE 0
+#define MAX_DATA_RANGE 20
+#define MIN_DATA_RANGE 5
 
 #define LEARNING_RATE .00000005
 //#define LEARNING_RATE .3 // For 1 feature training data
@@ -29,8 +30,11 @@ typedef struct CostFunction
 } CostFunction;
 
 float Exponentiate(float base, int power);
+float SquareRoot(float radicand);
 float Hypothesis(float* features, float* thetas, int numParameters);
 void PrintTrainingSet(TrainingSet* trainingSet);
+float StandardDeviation(float* featureValues, float mean, int sampleSize);
+void GrabVector(float** matrix, int numRows, int numCols, char* direction, int desiredIndex, float* out);
 
 void ReadTrainingData(TrainingSet* trainingSet)
 {
@@ -164,6 +168,8 @@ void ApplyFeatureScaling(TrainingSet* trainingSet, uint8_t applyMeanNormalizatio
 
     float* featureValSum = malloc(sizeof(float) * trainingSet->numFeatures);
 
+    float* standardDeviation = malloc(sizeof(float) * trainingSet->size);
+
     for(int featureIndex = 0; featureIndex < trainingSet->numFeatures; featureIndex++)
     {
         featureValSum[featureIndex] = 0;
@@ -179,34 +185,67 @@ void ApplyFeatureScaling(TrainingSet* trainingSet, uint8_t applyMeanNormalizatio
             else if( trainingSet->features[trainingExampleIndex][featureIndex] < minFeatureVal[featureIndex] )
                 minFeatureVal[featureIndex] = trainingSet->features[trainingExampleIndex][featureIndex];
 
+            //printf("Feature value at [%i][%i]: %f\n", trainingExampleIndex, featureIndex, trainingSet->features[trainingExampleIndex][featureIndex]);
             featureValSum[featureIndex] += trainingSet->features[trainingExampleIndex][featureIndex];
         }
 
-        printf("Max feature value: %f\tMin feature value: %f\n", maxFeatureVal[featureIndex], minFeatureVal[featureIndex]);
+        //printf("Max feature value: %f\tMin feature value: %f\n", maxFeatureVal[featureIndex], minFeatureVal[featureIndex]);
         featureValRange[featureIndex] = maxFeatureVal[featureIndex] - minFeatureVal[featureIndex];
-        printf("featureValRange[%i] = %f\n", featureIndex, featureValRange[featureIndex]);
+        //printf("featureValRange[%i] = %f\n", featureIndex, featureValRange[featureIndex]);
+    }
+
+    float* averageFeatureVal = calloc(trainingSet->numFeatures, sizeof(float));
+    if(applyMeanNormalization)
+    {
+        for(int i = 0; i < trainingSet->numFeatures; i++)
+        {
+            averageFeatureVal[i] = featureValSum[i] / trainingSet->size;
+            int numRows = trainingSet->size;
+            int numCols = trainingSet->numFeatures;
+            float* featureVector = malloc(sizeof(float) * numRows);
+            GrabVector(trainingSet->features, numRows, numCols, "column", i, featureVector); // Grab the column representing the feature vector
+            standardDeviation[i] = StandardDeviation(featureVector, averageFeatureVal[i], trainingSet->numFeatures);
+            free(featureVector);
+
+            if(standardDeviation[i] == 0)
+                standardDeviation[i] = 1;
+
+            //printf("standardDeviation[%i] = %f\n", i, standardDeviation[i]);
+            //printf("Feature Value Sum[%i]: %f\n", i, featureValSum[i]);
+            //printf("TrainingSetSIze = %i\n", trainingSet->size);
+            //printf("averageFeatureVal = %f\n", averageFeatureVal[i]);
+            //getchar();
+        
+            //printf("Feature val sum: %f\n", featureValSum[i]);
+            //printf("Average feature val: %f\n", averageFeatureVal[i]);
+        }
     }
 
     for( int i = 0; i < trainingSet->size; i++ )
     {
-        float averageFeatureVal;
-        if(applyMeanNormalization)
-            averageFeatureVal = featureValSum[i] / trainingSet->size;
-        printf("Feature val sum: %f\n", featureValSum[i]);
-        printf("Average feature val: %f\n", averageFeatureVal);
-
         for( int j = 0; j < trainingSet->numFeatures; j++ )
         {
-            printf("Feature value range = %f\n", featureValRange[j]);
-            printf("Feature %i before: %f\t", j, trainingSet->features[i][j]);
+            //printf("Feature value range = %f\n", featureValRange[j]);
+            //printf("Feature %i before: %f\n", j, trainingSet->features[i][j]);
             // Scale the feature down between a range (0 - 1)
-            trainingSet->features[i][j] /= featureValRange[j];
+            //trainingSet->features[i][j] /= featureValRange[i]; // This is using the max-mix method
+            trainingSet->features[i][j] /= standardDeviation[j]; // This is like above, but using the stnandard deviation method
+            //printf("standard deviation[%i]: %f\n", j, standardDeviation[j]);
+            //printf("Feature after dividing out standardDeviation: %f\n", trainingSet->features[i][j]);
 
             if(applyMeanNormalization)
-                trainingSet->features[i][j] -= (averageFeatureVal / featureValRange[j]);
-            else // This is in reference to wikipedia's version of feature scaling by mean sof "rescaling"
-                trainingSet->features[i][j]; // -= minFeatureVal[j]; Assuming I don't want this, since negatives?
-            printf("Feature %i after: %f\n", j, trainingSet->features[i][j]);
+            {
+                //trainingSet->features[i][j] -= (averageFeatureVal[j] / featureValRange[i]); // Using the max-mix method
+                trainingSet->features[i][j] -= (averageFeatureVal[j] / standardDeviation[j]); // Using standard deviation method
+                //printf("Average Feature Value: %f\n", averageFeatureVal[j]);
+                //printf("Subtrahend: %f\n", averageFeatureVal[j] / standardDeviation[j]);
+            }
+            else // This is in reference to wikipedia's version of feature scaling by means of "rescaling"
+            {
+                trainingSet->features[i][j]; // -= minFeatureVal[j]; Assuming I don't want this, since negatives? But wikipedia?
+            }
+
+            //printf("Feature %i after: %f\n", j, trainingSet->features[i][j]);
         }
     }
 
@@ -217,6 +256,7 @@ void ApplyFeatureScaling(TrainingSet* trainingSet, uint8_t applyMeanNormalizatio
     free(minFeatureVal);
     free(featureValRange);
     free(featureValSum);
+    free(standardDeviation);
 }
 
 TrainingSet* CreateTrainingSet()
@@ -278,10 +318,10 @@ CostFunction* CreateCostFunction(int numFeatures)
     costFunction->numParameters = numFeatures;
     costFunction->parameters = malloc(sizeof(float) * costFunction->numParameters);
 
+    // Some random start point for our thetas
     for(int i = 0; i < costFunction->numParameters; i++)
     {
-        // Some random start point for our thetas (TODO: Assuming the need for init to be within domain of training set) which isn't true for my recent training sets...
-        // TODO: Make this more dynamic and scalable for MAX_DATA_RANGE and MIN_... depending on max/min of data?
+        // TODO: Make this more dynamic and scalable for MAX_DATA_RANGE and MIN_... maybe try depending on max/min of data?
         costFunction->parameters[i] = ( (rand() % (MAX_DATA_RANGE - MIN_DATA_RANGE)) + MIN_DATA_RANGE );
     }
 
@@ -336,6 +376,80 @@ float Exponentiate(float base, int power)
     return result;
 }
 
+float SquareRoot(float radicand)
+{
+    if( !radicand )
+        return 0;
+    else if( radicand < 0 )
+    {
+        printf("Result is imaginary!\n");
+        return -1;
+    }
+
+    float result = 0;
+    float precision = 0.01;
+    int numIterations = 0;
+
+    int leftHandSquare;
+    int rightHandSquare;
+
+    for(int i = 0; i < radicand; i++)
+    {
+        if( i * i < radicand )
+        {
+            leftHandSquare = i;
+            rightHandSquare = i;
+        }
+        else if( i * i > radicand )
+        {
+            rightHandSquare = i;
+            break;
+        }
+        else
+        {
+            result = i;
+            break;
+        }
+        numIterations++;
+    }
+
+    float lhsApprox = leftHandSquare;
+    float rhsApprox = rightHandSquare;
+    //printf("lhsApprox = %f\n", lhsApprox);
+    //printf("rhsApprox = %f\n", rhsApprox);
+    //printf("Result: %i\n", result);
+
+    while(!result)
+    {
+        lhsApprox += precision;
+        rhsApprox -= precision;
+        //printf("Adjusted lhsApprox = %f\n", lhsApprox);
+        //printf("Adjusted rhsApprox = %f\n", rhsApprox);
+
+        if(lhsApprox * lhsApprox >= radicand)
+        {
+            //printf("APPROX FROM LHS: %f\n", lhsApprox);
+            result = lhsApprox;
+            break;
+        }
+        else if( leftHandSquare != rightHandSquare && rhsApprox * rhsApprox <= radicand)
+        {
+            //printf("APPROX FROM RHS: %f\n", rhsApprox);
+            result = rhsApprox;
+            break;
+        }
+        numIterations++;
+    }
+
+    //printf("leftHandSquare = %i\n", leftHandSquare);
+    //printf("rightHandSquare = %i\n", rightHandSquare);
+    //result = (leftHandSquare + rightHandSquare) / 2.0;
+
+    //printf("Number of iterations: %i\n", numIterations);
+
+    return result;
+}
+
 float AbsoluteValue(float val)
 {
     return val > 0 ? val : -val;
@@ -347,17 +461,119 @@ int round_down(float val)
     return val;
 }
 
-void UserProvidedFeature(CostFunction* costFunction, TrainingSet* trainingSet, float* thetas)
+void GrabVector(float** matrix, int numRows, int numCols, char* direction, int desiredIndex, float* out)
+{
+    if( !out )
+    {
+        printf("Result output must be initialized!\n");
+        return;
+    }
+
+    /*printf("OK1\n"); CANT DO THIS BECAUSE direction is A CONSTANT STRING!
+    int strLength = strlen(direction);
+    printf("strlen = %i\n", strLength);
+    for( int i = 0; i < strLength; i++ )
+    {
+        direction[i] = tolower(direction[i]);
+        printf("direction[%i] = %c\n", i, direction[i]);
+    }
+    printf("OK2\n");*/
+
+    if( direction == "row" )
+    {
+        if(desiredIndex >= numRows)
+        {
+            printf("desiredIndex is out of bounds!: %i\n", desiredIndex);
+            return;
+        }
+
+        for(int i = 0 ; i < numRows; i++)
+        {
+            if( i == desiredIndex )
+            {
+                // Grab the desired row
+                for(int j = 0; j < numCols; j++)
+                {
+                    out[j] = matrix[i][j];
+                }
+            }
+        }
+    }
+    else if( direction == "column" || direction == "col" )
+    {
+        if(desiredIndex >= numCols)
+        {
+            printf("desiredIndex is out of bounds!: %i\n", desiredIndex);
+            return;
+        }
+
+        for(int i = 0 ; i < numCols; i++)
+        {
+            if( i == desiredIndex )
+            {
+                // Grab the desired column
+                for(int j = 0; j < numRows; j++)
+                {
+                    out[j] = matrix[j][i];
+                }
+            }
+        }
+    }
+    else
+    {
+        printf("The direction must be either row or column!\n");
+        printf("You gave: %s\n", direction);
+        return;
+    }
+}
+
+float StandardDeviation(float* featureValues, float mean, int sampleSize)
+{
+    if(sampleSize <= 0)
+    {
+        printf("Sample Size is not valid: %i\n", sampleSize);
+        return -1;
+    }
+
+    float result = 0;
+
+    for(int i = 0; i < sampleSize; i++)
+    {
+        //float value = Exponentiate(featureValues[i] - mean, 2);
+        //printf("VALUE: %f\n", value);
+
+        result += Exponentiate(featureValues[i] - mean, 2);
+    }
+
+    return SquareRoot(result / sampleSize);
+}
+
+void UserProvidedFeature(CostFunction* costFunction, TrainingSet* trainingSet)
 {
     float* features = malloc(sizeof(float) * trainingSet->numFeatures);
     features[0] = 1;
-    for(int i = 1; i < trainingSet->numFeatures; i++)
-    {
-        printf("\nGive value to estimate for feature %i: ", i);
-        scanf("%f", &features[i]);
-    }
 
-    printf("Guess is: %0.2f\n", Hypothesis(features, thetas, costFunction->numParameters));
+    char anotherEstimate;
+
+    do
+    {
+        for(int i = 1; i < trainingSet->numFeatures; i++)
+        {
+            printf("\nGive value to estimate for feature %i: ", i);
+            scanf("%f", &features[i]);
+        }
+        printf("Guess is: %0.2f\n", Hypothesis(features, costFunction->parameters, costFunction->numParameters));
+
+        do
+        {
+            fflush(stdin); // Flush stdin buffer
+            printf("\nAnother estimate? (y/n): ");
+            scanf("%c", &anotherEstimate);
+            printf("\n");
+        }while( anotherEstimate != 'y' && anotherEstimate != 'Y' && anotherEstimate != 'n' && anotherEstimate != 'N' );
+
+    }while( anotherEstimate == 'y' || anotherEstimate == 'Y' );
+
     free(features);
 }
 
@@ -372,6 +588,8 @@ void TrainWithLinearRegression(CostFunction* costFunction, TrainingSet* training
     }
 
     float threashold = 0.0001;
+    //float threashold = 0.01;
+    //float precision = 10000;
     float precision = 10000;
     
     uint8_t converged;
@@ -379,6 +597,7 @@ void TrainWithLinearRegression(CostFunction* costFunction, TrainingSet* training
 
     float* theta_sums = malloc(sizeof(float) * costFunction->numParameters);
     float* theta_adjustments = malloc(sizeof(float) * costFunction->numParameters);
+    //ApplyFeatureScaling(trainingSet, 1);
 
     do
     {
@@ -392,32 +611,44 @@ void TrainWithLinearRegression(CostFunction* costFunction, TrainingSet* training
             for(int i = 0; i < trainingSet->size; i++)
             {
                 float estimated_value = Hypothesis(trainingSet->features[i], thetas, costFunction->numParameters);
+                //printf("Estimated Value: %f\n", estimated_value);
+
                 theta_sums[k] += (estimated_value - trainingSet->targets[i]) * trainingSet->features[i][k];
 
                 //printf("Feature[%i][%i] = %f\n", i, k, trainingSet->features[i][k]);
             }
         }
 
+        converged = 1; // Assume conversion. If possible, prove otherwise below.
         for(int k = 0; k < costFunction->numParameters; k++)
         {
             theta_adjustments[k] = (LEARNING_RATE * (theta_sums[k] / (float) trainingSet->size));
+            //printf("Theta Adjustment[%i] = %f\n", k, theta_adjustments[k]);
 
             costFunction->parameters[k] = thetas[k] = thetas[k] - theta_adjustments[k];
+            //printf("Theta[%i] = %f\n", k, thetas[k]);
 
             theta_adjustments[k] = round_down( (theta_adjustments[k] * precision) + 0.5 ) / precision;
+            //printf("Adjusted Theta Adjustment[%i] = %f\tThreashold = %f\n", k, theta_adjustments[k], threashold);
+            //printf("Absolute(ThetaAdjustment[%i]) = %f\n", k, AbsoluteValue(theta_adjustments[k]));
 
-            converged = 1; // Assume conversion. If possible, prove otherwise below.
             // If we have made a theta adjustment that is greater than our threashold, then we haven't converged yet, i.e. keep iterating
             if(AbsoluteValue(theta_adjustments[k]) > threashold)
             {
                 converged = 0;
+            }
+            else
+            {
+                //printf("%f <= %f\n", AbsoluteValue(theta_adjustments[k]), threashold);
             }
         }
 
         printf("CostFunction at iteration %i = %f\n", iterations, RunCostFunction(costFunction, trainingSet));
 
     } while(!converged);
-    ApplyFeatureScaling(trainingSet, 0);
+    printf("Final CostFunction = %f\n", RunCostFunction(costFunction, trainingSet));
+
+    //ApplyFeatureScaling(trainingSet, 0);
 
     printf("There are %i parameters\n", costFunction->numParameters);
     printf("%i iterations to obtain: ", iterations);
@@ -434,12 +665,11 @@ void TrainWithLinearRegression(CostFunction* costFunction, TrainingSet* training
             printf("+  ");
     }
 
-    UserProvidedFeature(costFunction, trainingSet, thetas);
-
     free(thetas);
     free(theta_sums);
     free(theta_adjustments);
 }
+
 
 int main(int argc, char** argv)
 {
@@ -448,8 +678,10 @@ int main(int argc, char** argv)
     TrainingSet* trainingSet = CreateTrainingSet();
     CostFunction* costFunction = CreateCostFunction(trainingSet->numFeatures);
 
-    PrintTrainingSet(trainingSet);
+    //PrintTrainingSet(trainingSet);
     TrainWithLinearRegression(costFunction, trainingSet);
+
+    UserProvidedFeature(costFunction, trainingSet);
 
     DestroyCostFunction(costFunction);
     DestroyTrainingSet(trainingSet);
