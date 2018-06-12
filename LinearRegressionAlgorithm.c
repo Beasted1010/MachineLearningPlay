@@ -9,8 +9,8 @@
 #define MAX_DATA_RANGE 20
 #define MIN_DATA_RANGE 5
 
-#define LEARNING_RATE .00000005
-//#define LEARNING_RATE .3 // For 1 feature training data
+//#define LEARNING_RATE .00000005
+#define LEARNING_RATE .3 // For 1 feature training data
 
 #define TRAINING_DATA_FILE "training_data.txt"
 
@@ -158,7 +158,6 @@ void ReadTrainingData(TrainingSet* trainingSet)
 }
 
 // TODO: Probably could do away with the pointers for max and min feature values (since all is done within the first outer for loop
-// TODO: This may not be correct, results seem to not be val / min-max ???? May want to disect
 void ApplyFeatureScaling(TrainingSet* trainingSet, uint8_t applyMeanNormalization)
 {
     float* maxFeatureVal = malloc(sizeof(float) * trainingSet->numFeatures);
@@ -248,9 +247,6 @@ void ApplyFeatureScaling(TrainingSet* trainingSet, uint8_t applyMeanNormalizatio
             //printf("Feature %i after: %f\n", j, trainingSet->features[i][j]);
         }
     }
-
-    printf("Normalized TrainingSet\n-----------------------\n");
-    PrintTrainingSet(trainingSet);
 
     free(maxFeatureVal);
     free(minFeatureVal);
@@ -597,7 +593,6 @@ void TrainWithLinearRegression(CostFunction* costFunction, TrainingSet* training
 
     float* theta_sums = malloc(sizeof(float) * costFunction->numParameters);
     float* theta_adjustments = malloc(sizeof(float) * costFunction->numParameters);
-    //ApplyFeatureScaling(trainingSet, 1);
 
     do
     {
@@ -645,10 +640,8 @@ void TrainWithLinearRegression(CostFunction* costFunction, TrainingSet* training
 
         printf("CostFunction at iteration %i = %f\n", iterations, RunCostFunction(costFunction, trainingSet));
 
-    } while(!converged);
+    } while(!converged); // && RunCostFunction(costFunction, trainingSet) > threashold);
     printf("Final CostFunction = %f\n", RunCostFunction(costFunction, trainingSet));
-
-    //ApplyFeatureScaling(trainingSet, 0);
 
     printf("There are %i parameters\n", costFunction->numParameters);
     printf("%i iterations to obtain: ", iterations);
@@ -676,9 +669,13 @@ int main(int argc, char** argv)
     srand(time(NULL));
 
     TrainingSet* trainingSet = CreateTrainingSet();
+    //PrintTrainingSet(trainingSet);
+    //ApplyFeatureScaling(trainingSet, 1);
+    printf("Normalized Training Set\n-------------------------------------------\n");
+    //PrintTrainingSet(trainingSet);
+
     CostFunction* costFunction = CreateCostFunction(trainingSet->numFeatures);
 
-    //PrintTrainingSet(trainingSet);
     TrainWithLinearRegression(costFunction, trainingSet);
 
     UserProvidedFeature(costFunction, trainingSet);
