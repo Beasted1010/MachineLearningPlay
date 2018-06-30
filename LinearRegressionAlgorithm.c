@@ -6,10 +6,12 @@
 #include <stdint.h>
 #include <string.h>
 
-#define MAX_DATA_RANGE 20
-#define MIN_DATA_RANGE 5
+// TODO: Need these values to be more dynamic. I want them dependent on feature values or something in training set
+#define MAX_DATA_RANGE 75
+#define MIN_DATA_RANGE 50
 
-#define LEARNING_RATE .00000005
+//#define LEARNING_RATE .00000005
+#define LEARNING_RATE 0.000000135
 //#define LEARNING_RATE .0000001
 //#define LEARNING_RATE .3 // For 1 feature training data
 
@@ -41,6 +43,9 @@ float LogisticRegressionHypothesis(float* features, float* thetas, int numParame
 void PrintTrainingSet(TrainingSet* trainingSet);
 float StandardDeviation(float* featureValues, float mean, int sampleSize);
 void GrabVector(float** matrix, int numRows, int numCols, char* direction, int desiredIndex, float* out);
+float CalculateAverageOfArray(float* arrayOfValues, int size);
+void ApplyFeatureScaling(TrainingSet* trainingSet, uint8_t applyMeanNormalization);
+void ScaleTargets(TrainingSet* trainingSet);
 
 uint8_t ValidateObject(void* ptr, char* objectName)
 {
@@ -269,6 +274,19 @@ void ApplyFeatureScaling(TrainingSet* trainingSet, uint8_t applyMeanNormalizatio
     free(averageFeatureVal);
 }
 
+// TODO: This does not work nicely (: I may want to get a larget scale than 0 to 1 for features who go into the 100s of thousands (:
+void ScaleTargets(TrainingSet* trainingSet)
+{
+    float averageTarget = CalculateAverageOfArray(trainingSet->targets, trainingSet->size);
+    printf("Average Target Value = %f\n", averageTarget);
+
+    for(int i = 0; i < trainingSet->size; i++)
+    {
+        trainingSet->targets[i] /= averageTarget;
+        printf("%i: Target old value = %f\t Target new value %f\n", i, trainingSet->targets[i] * averageTarget, trainingSet->targets[i]);
+    }
+}
+
 TrainingSet* CreateTrainingSet()
 {
     TrainingSet* trainingSet = malloc(sizeof(TrainingSet));
@@ -447,6 +465,17 @@ float Exponentiate(float base, int power)
     //printf("%f to the power of %i = %f\n", base, power, result);
 
     return result;
+}
+
+float CalculateAverageOfArray(float* arrayOfValues, int size)
+{
+    float sumAcc = 0;
+    for(int i = 0; i < size; i++)
+    {
+        sumAcc += arrayOfValues[i];
+    }
+
+    return sumAcc / size;
 }
 
 float SquareRoot(float radicand)
@@ -717,12 +746,12 @@ void TrainWithLinearRegression(CostFunction* costFunction, TrainingSet* training
         converged = 1; // Assume conversion. If possible, prove otherwise below.
         for(int k = 0; k < costFunction->numParameters; k++)
         {
-            printf("ThetaSums[%i] = %f\n", k, theta_sums[k]);
+            //printf("ThetaSums[%i] = %f\n", k, theta_sums[k]);
             theta_adjustments[k] = (LEARNING_RATE * (theta_sums[k] / (float) trainingSet->size));
-            printf("Theta Adjustment[%i] = %f\n", k, theta_adjustments[k]);
+            //printf("Theta Adjustment[%i] = %f\n", k, theta_adjustments[k]);
 
             costFunction->parameters[k] = thetas[k] = thetas[k] - theta_adjustments[k];
-            printf("Theta[%i] = %f\n", k, thetas[k]);
+            //printf("Theta[%i] = %f\n", k, thetas[k]);
 
             theta_adjustments[k] = round_down( (theta_adjustments[k] * precision) + 0.5 ) / precision;
             //printf("Adjusted Theta Adjustment[%i] = %f\tThreashold = %f\n", k, theta_adjustments[k], threashold);
@@ -739,7 +768,14 @@ void TrainWithLinearRegression(CostFunction* costFunction, TrainingSet* training
             }
         }
 
-        //printf("CostFunction at iteration %i = %f\n", iterations, RunLinearRegressionCostFunction(costFunction, trainingSet));
+        float costThisIteration = RunLinearRegressionCostFunction(costFunction, trainingSet);
+        if( costThisIteration < 0 )
+        {
+            printf("Cost function is negative! Meaning it overshot a spot where it should have ended!\n");
+            printf("CostFunction at iteration %i = %f\n", iterations, costThisIteration);
+            getchar();
+        }
+        printf("CostFunction at iteration %i = %f\n", iterations, costThisIteration);
 
     } while(!converged); // && RunLinearRegressionCostFunction(costFunction, trainingSet) > threashold);
     printf("Final CostFunction = %f\n", RunLinearRegressionCostFunction(costFunction, trainingSet));
@@ -776,7 +812,7 @@ int main(int argc, char** argv)
 
     TrainingSet* trainingSet = CreateTrainingSet();
     //PrintTrainingSet(trainingSet);
-    ApplyFeatureScaling(trainingSet, 0);
+    //ApplyFeatureScaling(trainingSet, 0);
     //printf("Normalized Training Set\n-------------------------------------------\n");
     PrintTrainingSet(trainingSet);
 
